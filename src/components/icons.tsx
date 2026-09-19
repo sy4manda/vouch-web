@@ -1,0 +1,10 @@
+const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+export const HomeIcon = () => <svg viewBox="0 0 24 24" {...p}><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" /></svg>;
+export const UserIcon = () => <svg viewBox="0 0 24 24" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>;
+export const LockIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" {...p} strokeWidth={2.4}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>;
+export const CheckIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" {...p} strokeWidth={2.8}><path d="m5 12 5 5 9-10" /></svg>;
+export const BackIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" {...p} strokeWidth={2.2}><path d="M20 12H5m6-7-7 7 7 7" /></svg>;
+export const XLogo = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="X"><path d="M18.2 2.3h3.3l-7.2 8.3 8.5 11.2h-6.7l-5.2-6.8-6 6.8H1.6l7.7-8.8L1.2 2.3H8l4.7 6.2zm-1.2 17.5h1.8L7.1 4.1H5.1z" /></svg>;
+export const LockAction = () => <svg width="18" height="18" viewBox="0 0 24 24" {...p}><rect x="4" y="11" width="16" height="10" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>;
+export const UnlockedAction = () => <svg width="18" height="18" viewBox="0 0 24 24" {...p}><rect x="4" y="11" width="16" height="10" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 7.5-2" /></svg>;
+export const ArrowUpAction = () => <svg width="18" height="18" viewBox="0 0 24 24" {...p} strokeWidth={2.1}><path d="M12 20V5m-6.5 6.5L12 5l6.5 6.5" /></svg>;
