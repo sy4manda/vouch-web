@@ -3,10 +3,14 @@ import { useMemo, type ReactNode } from 'react';
 import { createWalletClient, custom } from 'viem';
 import { base } from 'viem/chains';
 import { AuthContext, type Auth } from './auth';
+import { setReadTokenGetter } from './httpApi';
 
 function Bridge({ children }: { children: ReactNode }) {
   const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
+
+  // Set during render, not in an effect: child pages fire their first reads before a parent effect would run.
+  setReadTokenGetter(authenticated ? getAccessToken : null);
 
   const value = useMemo<Auth>(() => {
     // Prefer the Privy embedded wallet: it is the one tied to the X login.
@@ -41,7 +45,7 @@ export default function PrivyAuthProvider({ appId, children }: { appId: string; 
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['twitter'], // v1: X only
+        loginMethods: ['twitter', 'email'], // v1 is X only; email is a temporary way to test without an X account
         defaultChain: base,
         supportedChains: [base],
         embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' } },

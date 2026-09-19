@@ -9,8 +9,13 @@ const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const publicClient = createPublicClient({ chain: base, transport: http(import.meta.env.VITE_BASE_RPC_URL) });
 
+// Reads (feed, post, profile) also carry the token when signed in: the backend only serves unlocked text
+// to a verified wallet, not to whatever address the `viewer` query param names.
+let readToken: (() => Promise<string | null>) | null = null;
+export const setReadTokenGetter = (fn: (() => Promise<string | null>) | null) => { readToken = fn; };
+
 async function call<T>(path: string, init: RequestInit = {}, s?: Session): Promise<T> {
-  const token = s ? await s.getAccessToken() : null;
+  const token = s ? await s.getAccessToken() : await readToken?.().catch(() => null) ?? null;
   const res = await fetch(BASE_URL + path, {
     ...init,
     headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },

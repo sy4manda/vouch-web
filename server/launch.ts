@@ -1,22 +1,23 @@
 // Launch one vouch token per x402 endpoint on Doppler (multicurve, USDC-quoted, locked liquidity).
 //
 //   PRIVATE_KEY=0x... OWNER=0x... NAME="Good Data" SYMBOL=GDATA ENDPOINT=https://x402.bankr.bot/<wallet>/<name> \
-//     npx tsx launch.ts            # simulate only
-//   ... EXECUTE=1 npx tsx launch.ts # broadcast
+//     npx tsx server/launch.ts            # simulate only
+//   ... EXECUTE=1 npx tsx server/launch.ts # broadcast
 //
 // NETWORK=base (default) or baseSepolia. DRY=1 builds the params offline with no RPC calls.
-import { DopplerSDK, WAD, getAddresses } from '@whetstone-research/doppler-sdk/evm';
+import { DopplerSDK, WAD } from '@whetstone-research/doppler-sdk/evm';
 import { createPublicClient, createWalletClient, http, parseEther, type Address } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
+import { fileURLToPath } from 'node:url';
 
-const USDC: Record<number, Address> = {
+export const USDC: Record<number, Address> = {
   [base.id]: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   [baseSepolia.id]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 };
 
 // ---- the standard template: identical for every endpoint ----
-const TEMPLATE = {
+export const TEMPLATE = {
   supply: parseEther('1000000'), // 1M: keeps the token price legible at tiny market caps
   forSale: parseEther('950000'), // 95% on the curve, 5% to the endpoint owner (vested)
   ownerVestingSeconds: 180 * 24 * 60 * 60,
@@ -36,19 +37,12 @@ const TEMPLATE = {
   dopplerShare: parseEther('0.05'),
 };
 
-async function main() {
-  const dry = !!process.env.DRY;
-  const chain = process.env.NETWORK === 'baseSepolia' ? baseSepolia : base;
-  const account = privateKeyToAccount((process.env.PRIVATE_KEY ?? generatePrivateKey()) as `0x${string}`);
-  const owner = (process.env.OWNER ?? account.address) as Address;
-  const protocol = (process.env.PROTOCOL ?? account.address) as Address;
+export type LaunchInput = { name: string; symbol: string; tokenURI: string; owner: Address; protocol: Address; user: Address; dry?: boolean };
 
-  const transport = http(process.env.RPC_URL);
-  const publicClient = createPublicClient({ chain, transport });
-  const walletClient = createWalletClient({ chain, transport, account });
-  const sdk = new DopplerSDK({ publicClient, walletClient, chainId: chain.id });
-
-  const doppler = dry
+/** Builds the Doppler multicurve params for one endpoint from the standard template. */
+export async function buildLaunchParams(sdk: DopplerSDK, chainId: number, input: LaunchInput) {
+  const { owner, protocol } = input;
+  const doppler = input.dry
     ? { beneficiary: '0x0000000000000000000000000000000000000001' as Address, shares: TEMPLATE.dopplerShare }
     : await sdk.getAirlockBeneficiary(TEMPLATE.dopplerShare);
 
@@ -58,15 +52,10 @@ async function main() {
       ? [doppler, { beneficiary: owner, shares: WAD - doppler.shares }]
       : [doppler, { beneficiary: owner, shares: TEMPLATE.ownerShare }, { beneficiary: protocol, shares: TEMPLATE.protocolShare }];
 
-  const params = sdk
+  return sdk
     .buildMulticurveAuction()
-    .tokenConfig({
-      type: 'standard',
-      name: process.env.NAME ?? 'Vouch Test',
-      symbol: process.env.SYMBOL ?? 'VOUCH',
-      tokenURI: process.env.ENDPOINT ?? 'https://example.com', // point the token at the endpoint it vouches for
-    })
-    .saleConfig({ initialSupply: TEMPLATE.supply, numTokensToSell: TEMPLATE.forSale, numeraire: USDC[chain.id] })
+    .tokenConfig({ type: 'standard', name: input.name, symbol: input.symbol, tokenURI: input.tokenURI })
+    .saleConfig({ initialSupply: TEMPLATE.supply, numTokensToSell: TEMPLATE.forSale, numeraire: USDC[chainId] })
     .withCurves({
       numerairePrice: 1,
       numeraireDecimals: 6,
@@ -78,8 +67,29 @@ async function main() {
     .withVesting({ duration: BigInt(TEMPLATE.ownerVestingSeconds), cliffDuration: 0, recipients: [owner], amounts: [TEMPLATE.supply - TEMPLATE.forSale] })
     .withGovernance({ type: 'noOp' })
     .withMigration({ type: 'noOp' }) // liquidity stays locked in the v4 pool forever
-    .withUserAddress(account.address)
+    .withUserAddress(input.user)
     .build();
+}
+
+async function main() {
+  const dry = !!process.env.DRY;
+  const chain = process.env.NETWORK === 'baseSepolia' ? baseSepolia : base;
+  // PRIVATE_KEY, or the backend's DEPLOYER_PRIVATE_KEY from .env (blank counts as unset)
+  const account = privateKeyToAccount((process.env.PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY || generatePrivateKey()) as `0x${string}`);
+  const owner = (process.env.OWNER || account.address) as Address;
+  const protocol = (process.env.PROTOCOL || process.env.PROTOCOL_ADDRESS || account.address) as Address;
+
+  const transport = http(process.env.RPC_URL);
+  const publicClient = createPublicClient({ chain, transport });
+  const walletClient = createWalletClient({ chain, transport, account });
+  const sdk = new DopplerSDK({ publicClient, walletClient, chainId: chain.id });
+
+  const params = await buildLaunchParams(sdk, chain.id, {
+    name: process.env.NAME ?? 'Vouch Test',
+    symbol: process.env.SYMBOL ?? 'VOUCH',
+    tokenURI: process.env.ENDPOINT ?? 'https://example.com', // point the token at the endpoint it vouches for
+    owner, protocol, user: account.address, dry,
+  });
 
   console.log('chain:', chain.name, '| owner:', owner, '| protocol:', protocol);
   console.log('curves (ticks):', params.pool.curves.map((c: any) => `${c.tickLower}..${c.tickUpper} x${c.numPositions}`).join('  '));
@@ -93,4 +103,6 @@ async function main() {
   console.log('token:', result.tokenAddress, '\npoolId:', result.poolId, '\ntx:', result.transactionHash);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

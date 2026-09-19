@@ -54,6 +54,38 @@ Rules the UI relies on:
 - `feeUsd` is any amount from 0.01 to 1000 with at most two decimals (the composer offers 0.1, 1, 10, 100 and a custom field). Validate it server-side. Text is at most 280 characters.
 - Errors: non-2xx with `{ "error": "message" }`; the message is shown in a toast.
 
+## Backend (`server/`)
+
+Hono + SQLite (`node:sqlite`), implementing the REST contract above. It is its own package (`server/package.json`, own `node_modules`), because `@privy-io/node` and the Doppler SDK can't share a dependency tree with the frontend's Solana/React peers. The one override there (`@solana/kit` for Privy's unused Solana peer) is documented in `server/package.json`.
+
+```
+cd server && npm install
+cp .env.example .env   # repo root; fill the backend section (loaded via --env-file)
+npm run server         # from the repo root: http://localhost:8787  (set VITE_API_URL to it)
+npm run server:test    # 28 tests, no network needed
+```
+
+`npm --prefix server run launch` and `run keeper` are your standalone Doppler launch and buyback scripts.
+
+| File | Role |
+|---|---|
+| `app.ts` / `service.ts` | routes and logic: posts, unlocks, quotes, trade transactions, profiles |
+| `auth.ts` | verifies the Privy token (JWKS), reads the X profile and wallets from Privy; the wallet is never taken from the body |
+| `launch.ts` | your Doppler template; `chain.ts` calls `buildLaunchParams` per post, with the creator as owner and the deployer key paying gas |
+| `chain.ts` | quotes (Doppler quoter), Universal Router + Permit2 transactions, Swap-log indexing |
+| `handler-snippet.ts` | the x402 handler template; `bankr.ts` fills it per post and runs `bankr x402 deploy` |
+| `keeper.ts` | your Bankr Wallet API swap/burn calls; `buyback.ts` drives them from the database |
+| `curve.ts` | the template's curve computed analytically, for the chart and supply-sold display only |
+
+Flow: `POST /posts` deploys the endpoint, then launches the token. A human or agent pays the endpoint over x402; the handler calls `POST /hooks/unlock` (per-post HMAC secret) with the payer, and only then returns the text. That records the unlock forever and queues the fee; the keeper swaps batches into the token and burns them. The indexer reads PoolManager Swap logs for every live pool, so trades count as vouches whether or not the client calls `/confirm`.
+
+Decisions to know about:
+
+- `viewer` is ignored. Text is served only to a verified token whose wallet unlocked (or created) the post; the frontend sends the token on reads.
+- If the webhook can't be reached the handler returns 502, which x402 doesn't settle, so nobody pays for an unlock we couldn't record.
+- `BUYBACK_MODE=agent` uses the handler's `askAgent` path instead of the keeper; results aren't reported back, so buyback and burned stats stay at zero in that mode.
+- The Bankr CLI must be installed and logged in on the machine running the backend. Deploys are rate-limited to 20/hour/IP.
+
 ## Not built
 
 Editing or deleting posts, notifications, search, and wallet-only login (v1 is X only).

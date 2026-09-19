@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# backend
+.env
+vouch.db*
+.x402-build/
+pending.json
+
+# internal spec, not for the repo
+Runtime Hackathon.md
