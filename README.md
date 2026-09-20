@@ -43,6 +43,7 @@ browser  →  Vercel (SPA)  →  ngrok  →  API :8787  →  SQLite
 ## Production demo
 
 **https://vouch-web-app.vercel.app** is a demo, not a full mainnet product.
+Link to demo video: **https://www.youtube.com/watch?v=QNBEx50H5gY**
 
 | Works now | Does not |
 |---|---|
