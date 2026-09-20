@@ -1,5 +1,0 @@
-# Automatic HTTPS for the API. Point a DNS A record for API_DOMAIN at this server first.
-# PUBLIC_API_URL in .env must be https://<API_DOMAIN>: it is baked into every post's x402 handler.
-{$API_DOMAIN} {
-	reverse_proxy api:8787
-}

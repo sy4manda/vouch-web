@@ -70,7 +70,7 @@ export function createApp(deps: svc.Deps, authenticate: Authenticator) {
   });
   app.post('/posts/:id/unlock', writes, async (c) => {
     const user = await requireUser(c);
-    return c.json(svc.recordDemoUnlock(deps.db, user, c.req.param('id')));
+    return c.json(svc.recordDemoUnlock(deps.db, user, c.req.param('id') ?? ''));
   });
 
   app.get('/posts/:id/quote', async (c) => c.json(await svc.quoteBuy(deps, c.req.param('id'), c.req.query('usd'))));
