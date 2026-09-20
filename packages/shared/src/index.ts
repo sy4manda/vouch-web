@@ -34,6 +34,8 @@ export type Post = {
   endpointUrl: string; // Bankr x402 Cloud endpoint that serves the text
   unlocked: boolean; // for the current viewer
   text?: string; // only present when unlocked (or the viewer is the creator)
+  /** Seeded sample post: unlock is signed-in, not an on-chain x402 payment. */
+  demo?: boolean;
 };
 
 export type CurvePoint = { supply: number; priceUsd: number };
@@ -78,3 +80,6 @@ export interface Api {
   getProfile(idOrUsername: string, viewer?: string): Promise<ProfilePage>;
   getUsdcBalance(s: Session): Promise<number>;
 }
+
+export { DEMO_PEOPLE, DEMO_POSTS, demoVouchUsd } from './demoFeed.ts';
+export type { DemoPerson, DemoPostSpec } from './demoFeed.ts';

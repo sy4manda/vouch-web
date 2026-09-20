@@ -1,6 +1,6 @@
 // In-browser stand-in for the backend so the UI is fully clickable without one.
 // State lives in memory and is mirrored to localStorage on a best-effort basis.
-import { TRADE_FEE } from '@vouch/shared';
+import { DEMO_PEOPLE, DEMO_POSTS, TRADE_FEE, demoVouchUsd } from '@vouch/shared';
 import type { Api, CurvePoint, FeeTier, Post, PostDetail, Profile, Quote, SellQuote, Session, Sort, Voucher } from '@vouch/shared';
 
 // ---- curve: price = P0 * (1 + s/S0)^2, USDC-quoted, 1M supply ----
@@ -23,26 +23,16 @@ const addr = (n: number) => '0x' + n.toString(16).padStart(4, '0').repeat(10);
 const person = (n: number, username?: string, name?: string): Profile => ({ id: addr(n), wallet: addr(n), x: username ? { username, name: name! } : undefined });
 
 function seed(): State {
-  const people = [
-    person(0xa11c, 'mira_onchain', 'Mira'), person(0xb0b5, 'basedquant', 'based quant'), person(0xc4fe, 'ledgerlines', 'Ledger Lines'),
-    person(0xd00d), person(0xe1e1, 'agent_smithy', 'Smithy (agent)'), person(0xf00f, 'nightdesk', 'night desk'), person(0x1234), person(0x5678, 'tobi_runs_nodes', 'Tobi'),
-  ];
+  const people = DEMO_PEOPLE.map((p) => person(p.n, p.username, p.name));
   const profiles = Object.fromEntries(people.map((p) => [p.id, p]));
   const H = 3600_000;
-  const raw: [string, string, number, FeeTier, number, number, number[]][] = [
-    ['Which L2 sequencer feeds lag, ranked', 'Measured 14 days of sequencer feed latency across six rollups. Two of them publish 400ms+ behind their own RPC under load, which is enough to pick off any quote-based market maker. Ranking, methodology and the raw numbers are in the linked sheet. Cheapest edge I have found this year.', 0, 1, 30, 212, [1, 2, 4, 5, 7]],
-    ['The prompt that stopped my agent looping', 'If your agent retries the same failing tool call forever: stop describing the error to it. Give it a budget line instead. "You have 2 attempts left for this tool, then you must pick another approach." Loop rate on my evals went from 31% to 4%. Works across models.', 4, 0.1, 9, 640, [0, 1, 3, 5, 6, 7]],
-    ['Where the East Village still has $1,900 studios', 'Three buildings, all walk-ups, all managed by the same family office that never lists on the big sites. They post a paper sign in the lobby on the 1st of the month and it is gone by the 3rd. Addresses and the super\'s number below. Be polite, he is 74.', 5, 10, 52, 41, [0, 2]],
-    ['How I read a token unlock schedule in 90 seconds', 'Skip the pie chart. Find the cliff dates, divide each tranche by 30-day average volume, and ignore anything under 0.5 days of volume. What is left is the only supply that moves price. My sheet does it for any vesting contract address.', 1, 1, 75, 88, [0, 4, 6]],
-    ['Small caps an x402 crawler actually pays for', 'Logged every 402 my crawler agreed to pay over a month. It paid most for boring things: port schedules, permit filings, and one man\'s hand-kept list of grain elevator outages. Full list of 23 endpoints with price and hit count.', 2, 1, 3, 17, [4]],
-    ['A cold email that got 11 replies from 14 sends', 'Subject line was the recipient\'s own product name plus a number. Body was three sentences and one screenshot of their bug. No ask in the first mail. Template and the follow-up that closed four of them included.', 7, 0.1, 120, 305, [1, 3, 5]],
-    ['The one Foundry flag that halves fuzz time', 'Most suites re-deploy every contract per run. Snapshot state once in setUp, then use the flag below to fork from the snapshot instead of genesis. 46s to 21s on our repo with zero test changes.', 3, 0.1, 20, 58, [7]],
-    ['Private notes from a Tier-1 LP meeting', 'What three funds said off the record about how they size agent-infra bets this cycle, the revenue multiple they quietly anchor on, and the one metric that got a deal killed in partner meeting. No names. 270 characters of signal.', 5, 100, 140, 6, [1, 2]],
-  ];
-  const posts: Row[] = raw.map(([title, text, c, feeUsd, hoursAgo, unlocks, vs], i) => {
-    const row: Row = { id: `p${i + 1}`, title, text, creator: people[c].id, feeUsd, createdAt: Date.now() - hoursAgo * H, sold: 0, burned: 0, buybackUsd: 0, unlockedBy: [], vouches: {} };
-    vs.forEach((v, k) => applyBuy(row, people[v].id, [400, 150, 60, 25, 12, 8][k] * (1 + (i % 3))));
-    for (let u = 0; u < unlocks; u++) applyUnlock(row, u < people.length ? people[u].id : addr(0x9000 + u));
+  const posts: Row[] = DEMO_POSTS.map((spec, i) => {
+    const row: Row = {
+      id: `p${i + 1}`, title: spec.title, text: spec.text, creator: people[spec.creator].id, feeUsd: spec.feeUsd,
+      createdAt: Date.now() - spec.hoursAgo * H, sold: 0, burned: 0, buybackUsd: 0, unlockedBy: [], vouches: {},
+    };
+    spec.vouchers.forEach((v, k) => applyBuy(row, people[v].id, demoVouchUsd(i, k)));
+    for (let u = 0; u < spec.unlocks; u++) applyUnlock(row, u < people.length ? people[u].id : addr(0x9000 + u));
     return row;
   });
   return { posts, profiles, balances: {} };

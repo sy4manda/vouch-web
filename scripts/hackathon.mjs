@@ -113,7 +113,11 @@ function shutdown(code) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
+const overlayName = env.NETWORK === 'baseSepolia' ? 'server:testnet' : 'server:mainnet';
+const overlayFile = join(root, env.NETWORK === 'baseSepolia' ? '.env.testnet' : '.env.mainnet');
+const serverScript = existsSync(overlayFile) ? overlayName : 'server';
+
 if (apiUp) console.log(`api already on :${port}`);
-else run('api', 'npm', ['run', 'server']);
+else run('api', 'npm', ['run', serverScript]);
 if (tunnelUp) console.log(`ngrok already serving ${expectedPublic}`);
 else run('ngrok', 'ngrok', ['http', '--url', expectedPublic, port]);

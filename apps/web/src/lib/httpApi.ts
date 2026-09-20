@@ -53,6 +53,10 @@ export const httpApi: Api = {
   // user's wallet sign a USDC authorization, retries, and the endpoint returns the text. The Bankr
   // handler sees the payer in the `x-402-payer` header and records the unlock for that wallet.
   async unlock(post, s) {
+    if (post.demo) {
+      const body = await call<{ text: string }>(`/posts/${post.id}/unlock`, { method: 'POST' }, s);
+      return body.text;
+    }
     const wallet = await s.getWalletClient();
     if (!wallet) throw new Error('No wallet connected');
     const maxAtomic = BigInt(Math.round(post.feeUsd * 1e6)); // never sign for more than the listed fee

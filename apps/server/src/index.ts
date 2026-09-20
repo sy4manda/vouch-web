@@ -8,6 +8,7 @@ import { config, envProblems } from './config.ts';
 import { checkNetworkStamp, openDb } from './db/db.ts';
 import { bankrWallet, startKeeper, type KeeperHandle } from './bankr/buyback.ts';
 import { recoverStuckPosts } from './domain/recovery.ts';
+import { seedDemoFeed } from './domain/demoSeed.ts';
 import { indexerTick, publishing } from './domain/service.ts';
 import { alert } from './ops/alert.ts';
 import { startBackups } from './ops/backup.ts';
@@ -21,6 +22,8 @@ if (problems.length) {
 const db = openDb(config.dbPath);
 try { checkNetworkStamp(db, config.network); } catch (e) { console.error((e as Error).message); process.exit(1); }
 console.log(`network: ${config.network} | db: ${config.dbPath}`);
+const seeded = seedDemoFeed(db);
+if (seeded) console.log(`seeded ${seeded} sample post(s)`);
 const chain = baseChain();
 const deps = { db, chain, deployer: cliDeployer, alert };
 

@@ -11,6 +11,7 @@ import { alert as realAlert, type Alerter } from '../ops/alert.ts';
 import { getMeta, setMeta, tx, type DB } from '../db/db.ts';
 import { bad, notFound, tooMany, unavailable } from '../errors.ts';
 import { marketCap, priceAtSold, sampleCurve, soldAtPrice, START_PRICE, TOTAL_SUPPLY } from './curve.ts';
+import { isDemoPost } from './demoSeed.ts';
 
 type PostRow = {
   id: string; title: string; text: string; creator: string; fee_usd: number; created_at: number; status: string;
@@ -81,6 +82,7 @@ function toPost(db: DB, row: PostRow, viewer: string[]): Post {
     endpointUrl: row.endpoint_url,
     unlocked: readable,
     ...(readable ? { text: row.text } : {}),
+    ...(isDemoPost(row) ? { demo: true } : {}),
   };
 }
 
@@ -110,8 +112,10 @@ export async function getPost({ db, chain }: Deps, id: string, viewer: string[])
   if (viewer.length) {
     const q = viewer.map(() => '?').join(',');
     myVouchUsd = (db.prepare(`SELECT COALESCE(SUM(usd),0) u FROM trades WHERE post_id = ? AND kind='vouch' AND side='buy' AND wallet IN (${q})`).get(id, ...viewer) as { u: number }).u;
-    const balances = await Promise.all(viewer.map((w) => chain.tokenBalance(row.token_address as Address, w as Address).catch(() => 0)));
-    myTokens = balances.reduce((a, b) => a + b, 0);
+    if (row.token_address && !isDemoPost(row)) {
+      const balances = await Promise.all(viewer.map((w) => chain.tokenBalance(row.token_address as Address, w as Address).catch(() => 0)));
+      myTokens = balances.reduce((a, b) => a + b, 0);
+    }
   }
   const curve: CurvePoint[] = CURVE;
   return { ...post, curve, supplySold: soldAtPrice(post.priceUsd), totalSupply: TOTAL_SUPPLY, burned: row.burned, topVouchers, myVouchUsd, myTokens };
@@ -260,6 +264,14 @@ export function recordUnlock(db: DB, o: { postId: string; payer: string; eventId
   });
 }
 
+/** Signed-in unlock for seeded sample posts. No USDC moves and the keeper is not queued. */
+export function recordDemoUnlock(db: DB, user: AuthUser, id: string): { text: string } {
+  const row = liveRow(db, id);
+  if (!isDemoPost(row)) throw bad('Pay the unlock fee at the post endpoint');
+  db.prepare('INSERT OR IGNORE INTO unlocks(post_id, wallet, created_at) VALUES(?,?,?)').run(id, user.wallet, Date.now());
+  return { text: row.text };
+}
+
 // ---- trading ----------------------------------------------------------------------------------------
 
 const poolRef = (r: PostRow): PoolRef => ({ tokenAddress: r.token_address as Address, poolId: r.pool_id as Hex });
@@ -270,8 +282,15 @@ function parseAmount(v: unknown, what: string, max: number) {
   return n;
 }
 
+function requireOnchain(row: PostRow) {
+  if (isDemoPost(row) || !row.pool_id || !row.token_address) {
+    throw bad('This sample post is not on-chain. Unlock still works.');
+  }
+}
+
 export async function quoteBuy({ db, chain }: Deps, id: string, usdIn: unknown): Promise<Quote> {
   const row = liveRow(db, id);
+  requireOnchain(row);
   const usd = parseAmount(usdIn, 'dollar amount', 1_000_000);
   const out = rawToTokens(await chain.quote(poolRef(row), 'buy', usdToRaw(usd)));
   const sold = soldAtPrice(row.price_usd ?? START_PRICE);
@@ -281,6 +300,7 @@ export async function quoteBuy({ db, chain }: Deps, id: string, usdIn: unknown):
 
 export async function quoteSell({ db, chain }: Deps, id: string, tokensIn: unknown): Promise<SellQuote> {
   const row = liveRow(db, id);
+  requireOnchain(row);
   const tokens = parseAmount(tokensIn, 'token amount', TOTAL_SUPPLY);
   const usdOut = rawToUsd(await chain.quote(poolRef(row), 'sell', tokensToRaw(tokens)));
   const sold = soldAtPrice(row.price_usd ?? START_PRICE);
@@ -293,6 +313,7 @@ export async function buildTrade(
   body: { usd?: unknown; tokens?: unknown; slippageBps?: unknown; wallet?: unknown },
 ): Promise<{ transactions: Tx[] }> {
   const row = liveRow(db, id);
+  requireOnchain(row);
   const wallet = String(body.wallet ?? '').toLowerCase();
   if (!user.wallets.includes(wallet)) throw bad('That wallet is not linked to your account');
   const bps = body.slippageBps === undefined ? 300 : Number(body.slippageBps);

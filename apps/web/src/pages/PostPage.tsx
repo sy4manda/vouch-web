@@ -182,7 +182,9 @@ export function PostPage() {
 
       <section className="section">
         <h2>Trade this post's token</h2>
-        <TradePanel post={post} onPreview={setPreview} />
+        {post.demo
+          ? <p className="muted">This is sample content from the demo feed. Unlock works after you sign in; the token is not on-chain yet.</p>
+          : <TradePanel post={post} onPreview={setPreview} />}
       </section>
 
       <section className="section">

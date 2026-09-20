@@ -68,6 +68,10 @@ export function createApp(deps: svc.Deps, authenticate: Authenticator) {
     const user = await requireUser(c);
     return c.json(await svc.createPost(deps, user, await body(c)), 201);
   });
+  app.post('/posts/:id/unlock', writes, async (c) => {
+    const user = await requireUser(c);
+    return c.json(svc.recordDemoUnlock(deps.db, user, c.req.param('id')));
+  });
 
   app.get('/posts/:id/quote', async (c) => c.json(await svc.quoteBuy(deps, c.req.param('id'), c.req.query('usd'))));
   app.get('/posts/:id/sell-quote', async (c) => c.json(await svc.quoteSell(deps, c.req.param('id'), c.req.query('tokens'))));

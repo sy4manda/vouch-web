@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApp } from '../../src/http/app.ts';
 import { hookSecret } from '../../src/bankr/deploy.ts';
+import { seedDemoFeed } from '../../src/domain/demoSeed.ts';
 import { ALICE, BOB, testAuth, testDeps, withEnv } from '../helpers.ts';
 
 const setup = () => {
@@ -88,4 +89,22 @@ test('CORS allows each origin in CORS_ORIGIN and rejects others', async () => {
     const evil = await req('/health', { headers: { origin: 'https://evil.example' } });
     assert.notEqual(evil.headers.get('access-control-allow-origin'), 'https://evil.example');
   });
+});
+
+test('demo posts unlock with a session and stay locked without one', async () => {
+  const { deps, req } = setup();
+  seedDemoFeed(deps.db);
+  const feed = await (await req('/posts?sort=new')).json();
+  assert.equal(feed[0].demo, true);
+  assert.equal(feed[0].text, undefined);
+  const id = feed[0].id;
+  assert.equal((await req(`/posts/${id}/unlock`, { method: 'POST' })).status, 401);
+  const paid = await req(`/posts/${id}/unlock`, { method: 'POST', token: 'bob' });
+  assert.equal(paid.status, 200);
+  assert.ok((await paid.json()).text.length > 0);
+  const asBob = await (await req(`/posts/${id}`, { token: 'bob' })).json();
+  assert.equal(asBob.unlocked, true);
+  const real = await req('/posts', { token: 'alice', body: { title: 'Hello', text: 'the secret', feeUsd: 1 } });
+  const liveId = (await real.json()).id;
+  assert.equal((await req(`/posts/${liveId}/unlock`, { method: 'POST', token: 'bob' })).status, 400);
 });
