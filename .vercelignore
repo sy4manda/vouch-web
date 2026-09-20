@@ -1,0 +1,8 @@
+apps/server
+server
+deploy
+docs
+*.md
+.env
+.env.*
+!.env.example

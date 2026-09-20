@@ -1,38 +1,25 @@
 {
-  "name": "vouch-web",
+  "name": "vouch",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "description": "Pay-to-unlock 280-character posts, each with a token on a bonding curve",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview",
-    "build:demo": "vite build --config vite.demo.config.ts && node demo/wrap.mjs",
-    "server": "npm --prefix server start",
-    "server:test": "npm --prefix server test"
-  },
-  "dependencies": {
-    "@fontsource-variable/playfair-display": "^5.3.0",
-    "@fontsource-variable/source-serif-4": "^5.3.0",
-    "@privy-io/react-auth": "^3.44.0",
-    "@solana-program/system": "^0.14.1",
-    "@solana-program/token": "^0.16.1",
-    "@solana/kit": "^8.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4",
-    "viem": "^2.56.0",
-    "x402-fetch": "^1.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
-    "oxlint": "^1.81.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.3.0",
-    "vite-plugin-singlefile": "^2.3.3"
+    "setup": "npm --prefix apps/web ci && npm --prefix apps/server ci",
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "build:demo": "npm --prefix apps/web run build:demo",
+    "preview": "npm --prefix apps/web run preview",
+    "lint": "npm --prefix apps/web run lint",
+    "server": "npm --prefix apps/server run start",
+    "server:testnet": "npm --prefix apps/server run start:testnet",
+    "server:mainnet": "npm --prefix apps/server run start:mainnet",
+    "server:test": "npm --prefix apps/server run test",
+    "typecheck": "npm --prefix apps/server run typecheck && npm --prefix apps/web run build",
+    "pay-test": "npm --prefix apps/server run pay-test --",
+    "hackathon": "node scripts/hackathon.mjs",
+    "docker:build": "docker build -f deploy/server.Dockerfile -t vouch-api .",
+    "docker:up": "docker compose -f deploy/docker-compose.yml --env-file .env up -d --build",
+    "docker:logs": "docker compose -f deploy/docker-compose.yml --env-file .env logs -f api",
+    "docker:down": "docker compose -f deploy/docker-compose.yml --env-file .env down"
   }
 }

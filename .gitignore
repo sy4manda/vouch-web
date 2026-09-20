@@ -25,9 +25,15 @@ dist-ssr
 
 # backend
 .env
-vouch.db*
+.env.*
+!.env.example
+*.db
+apps/server/data/
+*.db-shm
+*.db-wal
 .x402-build/
 pending.json
 
 # internal spec, not for the repo
 Runtime Hackathon.md
+dist-demo

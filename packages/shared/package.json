@@ -1,0 +1,10 @@
+{
+  "name": "@vouch/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Types and constants shared by the web app and the server (source-only; consumed via the @vouch/shared path alias)",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
