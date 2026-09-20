@@ -18,7 +18,13 @@ async function call<T>(path: string, init: RequestInit = {}, s?: Session): Promi
   const token = s ? await s.getAccessToken() : await readToken?.().catch(() => null) ?? null;
   const res = await fetch(BASE_URL + path, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },
+    headers: {
+      'content-type': 'application/json',
+      // Free ngrok otherwise returns an HTML interstitial to browsers; that has no CORS headers, so fetch fails.
+      'ngrok-skip-browser-warning': 'true',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
   });
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `Request failed (${res.status})`);
   return res.json();

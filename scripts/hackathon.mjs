@@ -47,7 +47,7 @@ if (!cors.some((o) => o.includes('vercel.app'))) {
   problems.push('set CORS_ORIGIN to your https://<app>.vercel.app origin (comma-separate localhost if you also run Vite)');
 }
 if (viteApi && /localhost|127\.0\.0\.1/.test(viteApi)) {
-  problems.push('VITE_API_URL in .env is localhost; the Vercel build must use the ngrok URL (set it in the Vercel dashboard, then redeploy)');
+  console.warn('note: VITE_API_URL in .env is localhost (fine for npm run dev). The Vercel dashboard VITE_API_URL must be the ngrok https URL, then redeploy.');
 }
 
 if (problems.length) {
@@ -70,6 +70,24 @@ console.log(`frontend: ${cors.join(', ')}`);
 console.log(`api tunnel: ${expectedPublic}  ->  localhost:${port}`);
 console.log('Privy: allowlist the Vercel origin. Keep this laptop awake while judges are on the site.');
 
+async function json(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(String(res.status));
+  return res.json();
+}
+
+const apiUp = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.ok).catch(() => false);
+let tunnelUp = false;
+try {
+  const { tunnels } = await json('http://127.0.0.1:4040/api/tunnels');
+  tunnelUp = (tunnels ?? []).some((t) => hostOf(t.public_url) === ngrokHost);
+} catch { /* ngrok inspector not running */ }
+
+if (apiUp && tunnelUp) {
+  console.log(`already running: ${expectedPublic}/health`);
+  process.exit(0);
+}
+
 const children = [];
 let stopping = false;
 
@@ -79,7 +97,7 @@ function run(name, command, args) {
   child.on('exit', (code, signal) => {
     if (stopping) return;
     console.error(`${name} exited (${signal || code || 0})`);
-    shutdown(code ?? 1);
+    shutdown(code || 1);
   });
 }
 
@@ -95,5 +113,7 @@ function shutdown(code) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
-run('api', 'npm', ['run', 'server']);
-run('ngrok', 'ngrok', ['http', '--domain', ngrokHost, port]);
+if (apiUp) console.log(`api already on :${port}`);
+else run('api', 'npm', ['run', 'server']);
+if (tunnelUp) console.log(`ngrok already serving ${expectedPublic}`);
+else run('ngrok', 'ngrok', ['http', '--url', expectedPublic, port]);

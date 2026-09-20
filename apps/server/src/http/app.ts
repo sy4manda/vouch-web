@@ -19,7 +19,7 @@ export function createApp(deps: svc.Deps, authenticate: Authenticator) {
       if (allowed.includes('*')) return origin || '*';
       return allowed.includes(origin) ? origin : '';
     },
-    allowHeaders: ['authorization', 'content-type'],
+    allowHeaders: ['authorization', 'content-type', 'ngrok-skip-browser-warning'],
   }));
   app.use('*', bodyLimit({ maxSize: 16 * 1024, onError: (c) => c.json({ error: 'Request too large' }, 413) })); // posts are 280 chars
 
